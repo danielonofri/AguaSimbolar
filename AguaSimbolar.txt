@@ -1,0 +1,442 @@
+/*
+   RadioLib SX127x Receive with Interrupts Example
+
+   This example listens for LoRa transmissions and tries to
+   receive them. Once a packet is received, an interrupt is
+   triggered. To successfully receive data, the following
+   settings have to be the same on both transmitter
+   and receiver:
+    - carrier frequency
+    - bandwidth
+    - spreading factor
+    - coding rate
+    - sync word
+
+   Other modules from SX127x/RFM9x family can also be used.
+
+   For default module settings, see the wiki page
+   https://github.com/jgromes/RadioLib/wiki/Default-configuration#sx127xrfm9x---lora-modem
+
+   For full API reference, see the GitHub Pages
+   https://jgromes.github.io/RadioLib/
+*/
+#include <Average.h>
+#include <SPI.h>
+#include <RadioLib.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// SX1278 has the following connections:
+// NSS pin:   10
+// DIO0 pin:  2
+// RESET pin: 9
+// DIO1 pin:  3
+SX1278 radio = new Module(10, 2, 9, 3);
+// or using RadioShield
+// https://github.com/jgromes/RadioShield
+//SX1278 radio = RadioShield.ModuleA;
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);  //Puede ser 0x3F Chequear con lc2_Scanner.ino
+int SegundosTranscurridos = 0;
+float CotaMaxima = 340.00;
+unsigned long MillisAnteriores = 0;
+unsigned long MillisActuales = 0;
+unsigned long Divisor = 1000;
+String Paquete = "";
+const int Relay2 = 5;
+const int Relay1 = 7;
+bool Rly1 = false;
+bool Rly2 = false;
+//spromedios
+const int N = 15;  // cantidad de muestras
+float valores[N];  // buffer circular
+int indice = 0;    // índice actual
+int cantidadLecturas = 0;  // cuántos valores ya se guardaron
+float suma = 0;
+
+//promedios
+
+void setup() {
+
+  Serial.begin(9600);
+  while (!Serial)
+    ;
+  pinMode(Relay2, OUTPUT);
+  pinMode(Relay1, OUTPUT);
+
+  // initialize SX1278 with default settings
+  Serial.print(F("[SX1278] Initializing ... "));
+  int state = radio.begin();
+  if (state == ERR_NONE) {
+    Serial.println(F("success!"));
+  } else {
+    Serial.print(F("failed, code "));
+    Serial.println(state);
+    while (true)
+      ;
+  }
+  // set the function that will be called
+  // when new packet is received
+  radio.setDio0Action(setFlag);
+
+  // Inicializar el LCD
+  lcd.begin();
+  // Inicializar serial
+  Serial.begin(9600);
+  //Encender la luz de fondo.
+  lcd.backlight();
+
+  // Posiciones LCD 1602A
+  // Row|0123456789012345  ERROR
+  //  0 |Alt: 999     999
+  //  1 |Lts:  9999999.99
+  // Escribimos Etiquetas en el LCD.
+  lcd.setCursor(0, 0);
+  lcd.print("Sin Info...");
+  MillisAnteriores = millis();
+
+  // start listening for LoRa packets
+  Serial.print(F("[SX1278] Starting to listen ... "));
+  state = radio.startReceive();
+  if (state == ERR_NONE) {
+    Serial.println(F("success!"));
+  } else {
+    Serial.print(F("failed, code "));
+    Serial.println(state);
+    while (true)
+      ;
+  }
+
+  // if needed, 'listen' mode can be disabled by calling
+  // any of the following methods:
+  //
+  // radio.standby()
+  // radio.sleep()
+  // radio.transmit();
+  // radio.receive();
+  // radio.readData();
+  // radio.scanChannel();
+}
+
+/*************************************/
+// flag to indicate that a packet was received
+volatile bool receivedFlag = false;
+
+// disable interrupt when it's not needed
+volatile bool enableInterrupt = true;
+
+// this function is called when a complete packet
+// is received by the module
+// IMPORTANT: this function MUST be 'void' type
+//            and MUST NOT have any arguments!
+void setFlag(void) {
+  // check if the interrupt is enabled
+  if (!enableInterrupt) {
+    return;
+  }
+
+  // we got a packet, set the flag
+  receivedFlag = true;
+}
+/*************************************/
+
+
+void loop() {
+  String DistanciaPorRadio = "";
+  String EstadoBoton = "";
+
+  MillisActuales = millis();
+  if (MillisAnteriores > MillisActuales) {
+    MillisAnteriores = millis();
+  }
+  SegundosTranscurridos = (MillisActuales - MillisAnteriores) / Divisor;
+  ImprimirSegundos(SegundosTranscurridos);
+  String Paquete = "";
+  Paquete = EscucharRadio();
+  //Paquete = EscucharRadioSimulada();
+  if (Paquete.length() > 0) {
+    MillisAnteriores = millis();
+    Serial.println("Paquete:" + Paquete);
+    DistanciaPorRadio = ExtraerDistancia(Paquete);
+
+    actualizar(DistanciaPorRadio.toFloat());
+    Serial.print("Moda: ");
+    Serial.println(calcularPromedio());
+    Relays(String(calcularPromedio()), ExtraerEstadoBoton(Paquete));
+
+    ImprimirLectura("Dist.| Alt.| ULT", 0);
+
+    int Altura = 0;
+    int Dist = 0;
+    Dist = calcularPromedio();
+    Altura = 345 - Dist;
+
+
+    ImprimirLectura2(PadLeft4(Dist) + " | " + PadLeft3(Altura), DistanciaPorRadio);
+    if (cantidadLecturas >= 15) {
+      MostrarValoresMatriz();
+    }
+  }
+
+  delay(1000);
+}
+
+/**************************************
+*                                     *
+*             FUNCIONES               *
+*                                     *
+**************************************/
+
+float actualizar(float nuevoValor) {
+  // restar el valor viejo si el buffer ya está lleno
+  if (cantidadLecturas == N) {
+    suma -= valores[indice];
+  } else {
+    cantidadLecturas++;
+  }
+
+  // agregar el nuevo valor
+  valores[indice] = nuevoValor;
+  suma += nuevoValor;
+
+  // avanzar índice circular
+  indice = (indice + 1) % N;
+
+  // devolver promedio
+  return suma / cantidadLecturas;
+}
+
+
+
+float calcularPromedio() {
+  float suma = 0;
+  for (int i = 0; i < cantidadLecturas; i++) {
+    suma += valores[i];
+  }
+  return suma / cantidadLecturas;
+}
+
+
+
+void MostrarValoresMatriz() {
+  for (int i = 0; i < 15; i++) {
+    Serial.print("[");
+    Serial.print(i);
+    Serial.print(" ");
+    Serial.print(valores[i]);
+    Serial.println("]");
+  }
+}
+
+String EscucharRadio() {
+  String respuesta = "";
+  // check if the flag is set
+  if (receivedFlag) {
+    // disable the interrupt service routine while
+    // processing the data
+    enableInterrupt = false;
+
+    // reset flag
+    receivedFlag = false;
+
+    // you can read received data as an Arduino String
+    String str;
+    int state = radio.readData(str);
+
+    // you can also read received data as byte array
+    /*
+      byte byteArr[8];
+      int state = radio.readData(byteArr, 8);
+    */
+
+    if (state == ERR_NONE) {
+      // packet was successfully received
+      //Serial.println(F("[SX1278] Received packet!"));
+
+      // print data of the packet
+      //Serial.print(F("Data:"));
+      //Serial.print(str);
+      respuesta = str;
+      // print RSSI (Received Signal Strength Indicator)
+      //Serial.print(F(" | RSSI:"));
+      //Serial.print(radio.getRSSI());
+      //Serial.print(F(" dBm"));
+
+      // print SNR (Signal-to-Noise Ratio)
+      //Serial.print(F(" | SNR:"));
+      //Serial.print(radio.getSNR());
+      //Serial.print(F(" dB"));
+
+      // print frequency error
+      //Serial.print(F(" | Freq error:\t"));
+      //Serial.print(radio.getFrequencyError());
+      //Serial.println(F(" Hz"));
+
+    } else if (state == ERR_CRC_MISMATCH) {
+      // packet was received, but is malformed
+      Serial.println(F(" | CRC error!"));
+
+    } else {
+      // some other error occurred
+      Serial.print(F(" | Failed, code "));
+      Serial.println(state);
+    }
+
+    // put module back to listen mode
+    radio.startReceive();
+
+    // we're ready to receive more packets,
+    // enable interrupt service routine
+    enableInterrupt = true;
+  }
+  return respuesta;
+}
+
+String EscucharRadioSimulada() {
+  return "86.00#ON";
+}
+
+String ExtraerDistancia(String precibido) {
+  int InicioDIS = 0;
+  int FinDIS = 0;
+  String devolver = "";
+  InicioDIS = 0;
+  FinDIS = precibido.indexOf("#");
+  if (InicioDIS < FinDIS) {
+    devolver = precibido.substring(InicioDIS, FinDIS);
+  }
+  return devolver;
+}
+
+String ExtraerEstadoBoton(String precibido) {
+  int InicioDIS = 0;
+  int FinDIS = 0;
+  String devolver = "";
+  InicioDIS = precibido.indexOf("#");
+  if (InicioDIS >= 0) {
+    devolver = precibido.substring(InicioDIS + 1);
+  }
+  return devolver;
+}
+
+void ImprimirSegundos(int segundos) {
+  lcd.setCursor(11, 1);
+  lcd.print("|    ");
+  if (segundos > 120) {
+    MillisAnteriores = millis();
+    lcd.setCursor(10, 0);
+    lcd.print("|  000");
+  } else {
+    lcd.setCursor(10, 0);
+    if (segundos < 10) {
+      lcd.print(" |   " + String(segundos));
+    } else {
+      if (segundos < 100) {
+        lcd.print(" |  " + String(segundos));
+      } else {
+        lcd.print(" | " + String(segundos));
+      }
+    }
+  }
+  //Serial.println(String(segundos));
+}
+
+void ImprimirLectura(String plectura, int linea) {
+  //  String ccadena = plectura;
+  lcd.setCursor(0, linea);
+  //  //Serial.print(" ccadena:"+ccadena);
+  //  for (int i = 0; i <= 15 - plectura.length() ; i++) {
+  //    ccadena.concat(" ");
+  //    //Serial.print(" ccadena:"+ccadena);
+  //  }
+  lcd.print(plectura);
+}
+
+void ImprimirLectura2(String plectura, String rele) {
+  String ccadena = plectura;
+  lcd.setCursor(0, 1);
+  lcd.print("                ");
+  lcd.setCursor(0, 1);
+  lcd.print(ccadena);
+  lcd.setCursor(11, 1);
+  lcd.print("| " + rele);
+}
+
+void Relays(String altura, String presostato) {
+  Serial.println("Relay:" + presostato);
+  if (altura.toFloat() > 250) {
+    digitalWrite(Relay2, HIGH);
+    Rly2 = true;
+  } else {
+    digitalWrite(Relay2, LOW);
+    Rly2 = false;
+  }
+  if (presostato.indexOf("ON") >= 0) {
+    digitalWrite(Relay1, HIGH);
+    Rly1 = true;
+  } else {
+    digitalWrite(Relay1, LOW);
+    Rly1 = false;
+  }
+}
+
+String PadLeft3(int numero) {
+  String Resultado = "";
+  int longitud = 0;
+  String Cadena = "";
+  Cadena = String(numero);
+  Cadena.trim();
+  longitud = Cadena.length();
+  switch (longitud) {
+    case 0:
+      Resultado = "   ";
+      break;
+    case 1:
+      Resultado = "  " + Cadena;
+      break;
+    case 2:
+      Resultado = " " + Cadena;
+      break;
+    case 3:
+      Resultado = Cadena;
+      break;
+    default:
+      Resultado = "***";
+      break;
+  }
+
+  return Resultado;
+}
+String PadLeft4(int numero) {
+  String Resultado = "";
+  int longitud = 0;
+  String Cadena = "";
+  Cadena = String(numero);
+  Cadena.trim();
+  longitud = Cadena.length();
+  switch (longitud) {
+    case 0:
+      Resultado = "    ";
+      break;
+    case 1:
+      Resultado = "   " + Cadena;
+      break;
+    case 2:
+      Resultado = "  " + Cadena;
+      break;
+    case 3:
+      Resultado = " " + Cadena;
+      break;
+    case 4:
+      Resultado = Cadena;
+      break;
+    default:
+      Resultado = "***0";
+      break;
+  }
+
+  return Resultado;
+}
+/**************************************
+            FUNCIONES
+**************************************/
