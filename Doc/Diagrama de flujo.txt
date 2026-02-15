@@ -1,0 +1,50 @@
+                ┌──────────────────────┐
+                │      ESP-12E         │
+                │   (WiFi + LCD + LoRa)│
+                └─────────┬────────────┘
+                          │
+                          ▼
+                ┌──────────────────────┐
+                │   Recepción LoRa     │
+                │  "distancia:XXX"     │
+                └─────────┬────────────┘
+                          │
+                          ▼
+                ┌──────────────────────┐
+                │ Guardar en buffer    │
+                │ circular (20 lect.)  │
+                └─────────┬────────────┘
+                          │
+                          ▼
+                ┌──────────────────────┐
+                │ Calcular promedio    │
+                │ últimas lecturas     │
+                └─────────┬────────────┘
+                          │
+                          ▼
+                ┌──────────────────────┐
+                │ Mostrar en LCD:      │
+                │ - Distancia actual   │
+                │ - Promedio           │
+                │ - Segundos sin Rx    │
+                └─────────┬────────────┘
+                          │
+                          ▼
+                ┌──────────────────────┐
+                │ Leer pulsadores SW1-4│
+                │ (true/false)         │
+                └─────────┬────────────┘
+                          │
+                          ▼
+                ┌──────────────────────┐
+                │ POST a API           │
+                │ /api/Sensores        │
+                │ {distancia, sw1..sw4}│
+                └─────────┬────────────┘
+                          │
+                          ▼
+                ┌────────────────────────┐
+                │ GET a API              │
+                │ /api/Sensores/comandos │
+                │ Mostrar estado NET     │
+                └────────────────────────┘
