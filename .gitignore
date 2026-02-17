@@ -3,5 +3,6 @@
 *.bin
 *.o
 *.d
+guardar.bat
 build/
 __pycache__/
