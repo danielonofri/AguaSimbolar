@@ -26,7 +26,7 @@ void actualizarMediciones() {
 
       distancia = (int)p.distancia;
       if (distancia > 0) {
-        altura_agua = atoi(tank_h) - distancia;
+        altura_agua = atoi(tank_h) - distancia - atoi(sensor_m);
         porcentaje = map(distancia, atoi(tank_h), atoi(sensor_m), 0, 100);
         porcentaje = constrain(porcentaje, 0, 100);
       }

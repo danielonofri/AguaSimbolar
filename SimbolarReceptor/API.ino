@@ -13,15 +13,15 @@ void ejecutarAPI() {
   WiFiClient client;
   HTTPClient http;
   
-  Serial.print(F("[API] Conectando a: "));
-  Serial.println(api_url);
+  //Serial.print(F("[API] Conectando a: "));
+  //Serial.println(api_url);
 
   // 3. Inicio de la petición
   if (http.begin(client, api_url)) {
     http.addHeader("Content-Type", "application/json");
 
     // 4. Construcción del JSON
-    StaticJsonDocument<256> doc; // Usamos tamaño fijo para evitar fragmentación
+    JsonDocument doc; // Usamos tamaño fijo para evitar fragmentación
     doc["distancia"] = distancia;
     doc["tank_h"] = atoi(tank_h);
     doc["sensor_m"] = atoi(sensor_m);
@@ -42,15 +42,14 @@ void ejecutarAPI() {
       
       if (httpCode == HTTP_CODE_OK || httpCode == 201) {
         apiStatus = 1; // ✔️
-        Serial.println(F("[API] Datos enviados con éxito."));
       } else {
         apiStatus = 2; // ⚠️ (El servidor respondió pero rechazó el dato)
-        Serial.print(F("[API] Error del servidor: "));
+        Serial.printf("⚠️");
         Serial.println(http.getString()); 
       }
     } else {
       apiStatus = 0; // ❌
-      Serial.printf("[API] Fallo de conexión: %s\n", http.errorToString(httpCode).c_str());
+      Serial.printf("[API] ❌: %s\n", http.errorToString(httpCode).c_str());
     }
     http.end();
   } else {

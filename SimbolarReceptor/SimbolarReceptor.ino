@@ -51,7 +51,7 @@ void saveConfigCallback() {
   shouldSaveConfig = true;
 }
 
-
+Paquete p;
 
 void setup() {
   Serial.begin(115200);
@@ -81,7 +81,18 @@ void setup() {
   wm.autoConnect("AguaSimbolar_AP");
   Serial.println(F("[SISTEMA] Configurando LoRa..."));
   LoRa.setPins(csPin, resetPin, irqPin);
-  if (!LoRa.begin(433E6)) Serial.println(F("Error LoRa"));
+  if (!LoRa.begin(433E6)) {
+    Serial.println(F("LORA RECEPTOR: ERROR (No se encuentra el chip)"));
+    // Aquí puedes prender un LED de error si tienes uno
+    while (1)
+      ;
+  } else {
+    // Si llegó acá, es que el hardware respondió 0x12 internamente
+    Serial.println(F("LORA RECEPTOR: OK (Hardware detectado)"));
+  }
+
+
+  LoRa.setSyncWord(0xF3);
   LoRa.enableCrc();
 
   configTime(-3 * 3600, 0, "ar.pool.ntp.org", "time.google.com");
@@ -89,15 +100,52 @@ void setup() {
   lcd.clear();
 }
 
+// void loop() {
+//   int packetSize = LoRa.parsePacket();
+
+//   if (packetSize == sizeof(p)) {
+//     // Leemos los 20 bytes y los cargamos en la estructura 'p'
+//     LoRa.readBytes((uint8_t *)&p, sizeof(p));
+
+//     Serial.println(F("\n--- NUEVA MEDICIÓN ---"));
+//     Serial.print(F("Distancia: ")); Serial.print(p.distancia); Serial.println(" cm");
+//     Serial.print(F("S1: ")); Serial.println(p.s1);
+//     Serial.println(F("----------------------"));
+
+//     // Aquí podés llamar a la función que envía a la base de datos
+//     // enviarWeb(p.distancia, p.s1);
+//   }
+//   else if (packetSize > 0) {
+//     // Si llega ruido (114, 197, etc.), lo barremos
+//     while (LoRa.available()) LoRa.read();
+//   }
+
+//   // ¡Muy importante para evitar el Soft WDT reset!
+//   yield();
+// }
+
+
 void loop() {
   wm.process();
   procesarGuardadoConfig();
   gestionarSerial();
   gestionarBotonMultifuncion();
+  // --- LÓGICA DE RECEPCIÓN LORA ---
+  int packetSize = LoRa.parsePacket();
+  if (packetSize == sizeof(p)) {
+    LoRa.readBytes((uint8_t *)&p, sizeof(p));
+    Serial.println(F("LoRa: Datos recibidos y actualizados."));
+    // Aquí podés marcar una bandera si querés que la API se ejecute
+    // inmediatamente después de recibir un dato
+  } else if (packetSize > 0) {
+    while (LoRa.available()) LoRa.read();  // Limpiamos ruido
+  }
+  // --------------------------------
   actualizarMediciones();
 
   if (WiFi.status() == WL_CONNECTED) {
     ejecutarAPI();
   }
   rotarPantallas();
+  yield();
 }
