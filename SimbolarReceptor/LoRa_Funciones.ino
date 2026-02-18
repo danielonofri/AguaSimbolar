@@ -17,7 +17,7 @@ void actualizarMediciones() {
     if (packetSize == sizeof(Paquete)) {
       Paquete p;
       LoRa.readBytes((uint8_t *)&p, sizeof(p));
-      
+
       // Mapeo simple
       sw_remotos[1] = (p.s1 > 0.5);
       sw_remotos[2] = (p.s2 > 0.5);
@@ -26,13 +26,12 @@ void actualizarMediciones() {
 
       distancia = (int)p.distancia;
       if (distancia > 0) {
-        altura_agua = atoi(tank_h) - distancia - atoi(sensor_m);
-        porcentaje = map(distancia, atoi(tank_h), atoi(sensor_m), 0, 100);
+        altura_agua = atoi(tank_h) - distancia + atoi(sensor_m);
+        porcentaje = map(altura_agua, 0, atoi(tank_h), 0, 100);
         porcentaje = constrain(porcentaje, 0, 100);
       }
       Serial.printf("[LoRa] OK! Dist: %d cm\n", distancia);
-    } 
-    else {
+    } else {
       // Ignorar basura y limpiar el módulo inmediatamente
       while (LoRa.available()) LoRa.read();
       // Solo imprimimos si realmente queremos debuguear, sino, silencio.
