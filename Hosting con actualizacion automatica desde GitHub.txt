@@ -1,0 +1,12 @@
+Ve a dashboard.render.com/register.
+Haz clic en el botón "Sign up with GitHub" (no uses email/password).
+GitHub te preguntará si confías en Render. Dale a "Authorize Render".
+
+Ahora sigue los pasos:
+Clic en "New +" (arriba a la derecha).
+Elige "Web Service".
+Verás tu repo simbolar-api en la lista. Dale al botón "Connect".
+
+git remote set-url origin https://github.com/danielonofri/simbolar-api.git
+
+https://simbolar-api.onrender.com/api/Sensores/estado

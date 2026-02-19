@@ -7,6 +7,7 @@
 #include <time.h>
 #include <SPI.h>
 #include <LoRa.h>
+#include <WiFiClientSecure.h>
 
 // --- Hardware ---
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -25,7 +26,8 @@ struct Paquete {
 // --- Variables Globales ---
 int delta_max = 15;
 char tank_h[6] = "220", sensor_m[6] = "20", tank_delta[5] = "15";
-char api_url[100] = "http://45.234.117.236:54625/api/Sensores";
+//char api_url[100] = "http://45.234.117.236:54625/api/Sensores";
+char api_url[100] = "https://simbolar-api.onrender.com/api/Sensores";
 int distancia = 0, porcentaje = 0, altura_agua = 0, distanciaAnterior = 0, lecturasEstables = 0;
 bool sw_remotos[5] = { false };
 const int LECTURAS_PARA_ARRANQUE = 5;
@@ -57,6 +59,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println(F("\n--- INICIANDO RECEPTOR ---"));
+  configTime(0, 0, "time.google.com", "pool.ntp.org");
   pinMode(PIN_BOTON_MULTIFUNCION, INPUT_PULLUP);
 
   Wire.begin(5, 0);

@@ -1,0 +1,6 @@
+git init
+git add .
+git commit -m "Primer subida de la API"
+git branch -M main
+git remote add origin https://github.com/TU_USUARIO/simbolar-api.git
+git push -u origin main
