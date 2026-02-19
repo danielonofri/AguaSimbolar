@@ -16,13 +16,13 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 const int csPin = 15;
 const int resetPin = 16;
 const int irqPin = 4;
-// struct Paquete {
-//   float s1;
-//   float s2;
-//   float s3;
-//   float s4;
-//   float distancia;
-// };
+struct Paquete {
+  float s1;
+  float s2;
+  float s3;
+  float s4;
+  float distancia;
+};
 
 struct Payload {
   float distancia; // Lectura del sensor
@@ -38,11 +38,13 @@ char api_url[100] = "https://simbolar-api.onrender.com/api/Sensores";
 int distancia = 0, porcentaje = 0, altura_agua = 0, distanciaAnterior = 0, lecturasEstables = 0;
 bool sw_remotos[5] = { false };
 const int LECTURAS_PARA_ARRANQUE = 5;
-unsigned long tScroll = 0, tApi = 0;
+unsigned long  tApi = 0;
+int pantallaActual = 0;      // <--- AQUÍ VA LA VARIABLE
+bool lcdEncendido = true;
+unsigned long tScroll = 0;
 
 int apiStatus = 0;
 bool shouldSaveConfig = false;
-bool lcdEncendido = true;
 int pantalla = 0;
 
 WiFiManager wm;
@@ -139,7 +141,8 @@ void loop() {
   wm.process();
   procesarGuardadoConfig();
   gestionarSerial();
-  gestionarBotonMultifuncion();
+  gestionarBotonMultifuncion(); // Estará en el archivo del Botón
+  // rotarPantallas();
   // --- LÓGICA DE RECEPCIÓN LORA ---
   int packetSize = LoRa.parsePacket();
   if (packetSize == sizeof(p)) {

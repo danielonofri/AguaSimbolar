@@ -1,15 +1,15 @@
-// --- CONFIGURACIÓN DE PINES ---
-// Entradas (p_in): Usamos los 4 primeros analógicos como digitales
-#define PIN_IN_1 A0
-#define PIN_IN_2 A1
-#define PIN_IN_3 A2
-#define PIN_IN_4 A3
+// --- CONFIGURACIÓN DE PINES (Mapeo numérico para Arduino Uno) ---
+// Entradas (p_in)
+#define PIN_IN_1 14 // Equivale a A0 
+#define PIN_IN_2 15 // Equivale a A1 
+#define PIN_IN_3 16 // Equivale a A2 
+#define PIN_IN_4 17 // Equivale a A3 
 
-// Salidas (p_out): Usamos los 2 analógicos restantes + 2 digitales seguros
-#define PIN_OUT_1 A4
-#define PIN_OUT_2 A5
-#define PIN_OUT_3 7   // Pin Digital 7 (Libre de SPI)
-#define PIN_OUT_4 8   // Pin Digital 8 (Libre de SPI)
+// Salidas (p_out)
+#define PIN_OUT_1 18 // Equivale a A4 
+#define PIN_OUT_2 19 // Equivale a A5 
+#define PIN_OUT_3 7  // Pin Digital 7 [cite: 69]
+#define PIN_OUT_4 8  // Pin Digital 8 [cite: 69]
 
 void configurarHardware() {
   // Configuración de Entradas con Pull-Up interno

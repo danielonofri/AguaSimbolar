@@ -13,44 +13,27 @@ const int irqPin = 2;    // DIO0
 #define SU_TRIGGER 4
 #define SU_ECHO 5
 
-// 3. Los 4 Switches (Pines definidos por el usuario)
-#define SW1 3
-#define SW2 6
-#define SW3 7
-#define SW4 8
-
-// RF24 radio(CE_PIN, CSN_PIN);
-// byte direccion[5] = {'c', 'a', 'u', 'n', 'a'};
-
-// Estructura de 5 datos: 4 switches y la distancia [cite: 3, 13, 14]
-// struct Paquete {
-//   float s1;
-//   float s2;
-//   float s3;
-//   float s4;
-//   float distancia;
-// };
 struct LoRaPayload {
   float dist;
   byte p_in;
-  0 1 3 7 15 byte p_out;
+  byte p_out;
 };
 
-Paquete registro;
+// --- VARIABLES GLOBALES DE COMUNICACIÓN ---
+LoRaPayload data;              // Estructura principal de datos [cite: 72]
+volatile byte comandoRecibido = 0; // Almacena el byte p_out recibido
+volatile bool nuevoComando = false; // Bandera para la interrupción
 
 void setup() {
   Serial.begin(9600);
-  configurarPines();
+  configurarHardware();
 
   pinMode(PIN_ROJO, OUTPUT);
   pinMode(PIN_VERDE, OUTPUT);
   digitalWrite(PIN_ROJO, HIGH);  // Inicia en Rojo (Standby)
   digitalWrite(PIN_VERDE, LOW);
   // Configuración de los 4 switches con Pull-Up [cite: 5]
-  pinMode(SW1, INPUT_PULLUP);
-  pinMode(SW2, INPUT_PULLUP);
-  pinMode(SW3, INPUT_PULLUP);
-  pinMode(SW4, INPUT_PULLUP);
+
   pinMode(SU_TRIGGER, OUTPUT);
   pinMode(SU_ECHO, INPUT);
   digitalWrite(SU_TRIGGER, LOW);
@@ -69,49 +52,52 @@ void setup() {
 }
 
 void loop() {
-  // 1. Medir Distancia (Lógica probada por el usuario) [cite: 14, 21, 22]
-  registro.distancia = devuelve_distancia();
 
-  data.p_in = leerEntradas();
+  // 1. Si la interrupción detectó un comando nuevo, lo aplicamos
+  if (nuevoComando) {
+    escribirSalidas(comandoRecibido);
+    nuevoComando = false;
+    Serial.print(F("[LoRa] Nuevo comando aplicado: "));
+    Serial.println(comandoRecibido);
+  }
 
+  // 2. Envío periódico de datos (Reporte)
+  static unsigned long tEnvio = 0;
+  if (millis() - tEnvio > 5000) {  // Enviamos cada 5 segundos
+    LoRaPayload reporte;
+    reporte.dist = devuelve_distancia();
+    reporte.p_in = leerEntradas();
+    reporte.p_out = 0;  // El transmisor no manda comandos, manda estado
+    Serial.print("Enviando Dist: ");
+    Serial.print(data.dist);
+    Serial.print(" cm | SWs: ");
+    Serial.print(reporte.p_in);
+    Serial.print(reporte.p_out);
+    LoRa.beginPacket();
+    LoRa.write((uint8_t *)&reporte, sizeof(reporte));
+    if (LoRa.endPacket()) {
+      // --- ÉXITO: Destello VERDE ---
+      digitalWrite(PIN_VERDE, HIGH);
+      digitalWrite(PIN_ROJO, LOW);
+      Serial.println(F(" [ENVÍO OK]"));
 
-  escribirSalidas(data.p_out);  
+      delay(300);  // Duración del destello verde
+    } else {
+      // --- FALLO: Destello ROJO ---
+      digitalWrite(PIN_VERDE, LOW);
+      digitalWrite(PIN_ROJO, HIGH);
+      Serial.println(F(" [FALLO DE HARDWARE EN ENVIO]"));
 
-  registro.s1 = !digitalRead(SW1);
-  registro.s2 = !digitalRead(SW2);
-  registro.s3 = !digitalRead(SW3);
-  registro.s4 = !digitalRead(SW4);
-  Serial.print("Enviando Dist: ");
-  Serial.print(registro.distancia);
-  Serial.print(" cm | SWs: ");
-  Serial.print((int)registro.s1);
-  Serial.print((int)registro.s2);
-  Serial.print((int)registro.s3);
-  Serial.print((int)registro.s4);
+      delay(1000);  // Duración del aviso rojo
+    }
 
-
-  // Envío del paquete binario (Estructura)
-  LoRa.beginPacket();
-  LoRa.write((uint8_t *)&registro, sizeof(registro));
-  if (LoRa.endPacket()) {
-    // --- ÉXITO: Destello VERDE ---
-    digitalWrite(PIN_VERDE, HIGH);
-    digitalWrite(PIN_ROJO, LOW);
-    Serial.println(F(" [ENVÍO OK]"));
-
-    delay(300);  // Duración del destello verde
-  } else {
-    // --- FALLO: Destello ROJO ---
-    digitalWrite(PIN_VERDE, LOW);
-    digitalWrite(PIN_ROJO, HIGH);
-    Serial.println(F(" [FALLO DE HARDWARE EN ENVIO]"));
-
-    delay(1000);  // Duración del aviso rojo
+    // MUY IMPORTANTE: Volver a modo recepción después de enviar
+    LoRa.receive();
+    tEnvio = millis();
   }
   digitalWrite(PIN_VERDE, LOW);
   digitalWrite(PIN_ROJO, LOW);
   Serial.println(" [ENVIADO]");
-  delay(3000);
 }
 
 float devuelve_distancia() {
