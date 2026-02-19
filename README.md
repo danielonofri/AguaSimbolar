@@ -73,12 +73,3 @@ Para que el Arduino Uno reciba los comandos de salida sin colgar el circuito (ev
 3. **El Transmisor (Uno) procesa la vuelta:**
 * Si recibe el paquete en su "ventana de escucha", extrae el `p_out`.
 * Llama a la función `escribirSalidas(p_out)` para activar/desactivar los relés.
-
-
-
-#### **Por qué este método no cuelga el sistema:**
-
-* **No hay colisiones:** El Uno es el "maestro" que marca el ritmo. El Receptor solo habla cuando el Uno acaba de terminar de hablar.
-* **Sin bloqueos:** Si el Receptor no responde (por ejemplo, si el WiFi está lento), el Uno cierra su ventana de escucha y sigue con su siguiente ciclo. Nunca se queda esperando para siempre.
-
-**¿Te parece que mañana arranquemos con el código específico de esta "ventana de escucha" en los archivos .ino?**
