@@ -23,18 +23,25 @@ const int irqPin = 2;    // DIO0
 // byte direccion[5] = {'c', 'a', 'u', 'n', 'a'};
 
 // Estructura de 5 datos: 4 switches y la distancia [cite: 3, 13, 14]
-struct Paquete {
-  float s1;
-  float s2;
-  float s3;
-  float s4;
-  float distancia;
+// struct Paquete {
+//   float s1;
+//   float s2;
+//   float s3;
+//   float s4;
+//   float distancia;
+// };
+struct LoRaPayload {
+  float dist;
+  byte p_in;
+  0 1 3 7 15 byte p_out;
 };
 
 Paquete registro;
 
 void setup() {
   Serial.begin(9600);
+  configurarPines();
+
   pinMode(PIN_ROJO, OUTPUT);
   pinMode(PIN_VERDE, OUTPUT);
   digitalWrite(PIN_ROJO, HIGH);  // Inicia en Rojo (Standby)
@@ -64,6 +71,12 @@ void setup() {
 void loop() {
   // 1. Medir Distancia (Lógica probada por el usuario) [cite: 14, 21, 22]
   registro.distancia = devuelve_distancia();
+
+  data.p_in = leerEntradas();
+
+
+  escribirSalidas(data.p_out);  
+
   registro.s1 = !digitalRead(SW1);
   registro.s2 = !digitalRead(SW2);
   registro.s3 = !digitalRead(SW3);

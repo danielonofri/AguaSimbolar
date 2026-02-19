@@ -16,13 +16,20 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 const int csPin = 15;
 const int resetPin = 16;
 const int irqPin = 4;
-struct Paquete {
-  float s1;
-  float s2;
-  float s3;
-  float s4;
-  float distancia;
+// struct Paquete {
+//   float s1;
+//   float s2;
+//   float s3;
+//   float s4;
+//   float distancia;
+// };
+
+struct Payload {
+  float distancia; // Lectura del sensor
+  byte p_in;       // Bits 0-3: Estado de botones en Uno
+  byte p_out;      // Bits 0-3: Órdenes para relés en Uno
 };
+
 // --- Variables Globales ---
 int delta_max = 15;
 char tank_h[6] = "220", sensor_m[6] = "20", tank_delta[5] = "15";
