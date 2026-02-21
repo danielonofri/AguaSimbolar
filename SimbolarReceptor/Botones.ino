@@ -22,7 +22,7 @@ void gestionarBotonMultifuncion() {
       // ACCIÓN 1: CLIC CORTO (Menos de 1.5 segundos) -> ROTAR PANTALLA
       if (duracion > 50 && duracion < 1500) {
         pantallaActual++;
-        if (pantallaActual > 2) pantallaActual = 0; // Ciclo entre 3 pantallas
+        if (pantallaActual > 3) pantallaActual = 0; // Ciclo entre 3 pantallas
         actualizarPantallaInmediato(); // Función para refrescar el LCD rápido
         Serial.print(F("[BOTÓN] Rotar Pantalla: ")); Serial.println(pantallaActual);
       }

@@ -6,14 +6,14 @@ void ejecutarAPI() {
 
   WiFiClientSecure client;
   client.setInsecure();
-  
-  // 👉 EL AJUSTE CLAVE: 
+
+  // 👉 EL AJUSTE CLAVE:
   // Obliga al servidor y al micro a usar fragmentos de 1KB.
   // Esto evita el error de "protocol version unsupported" en servidores modernos.
-  client.setBufferSizes(1024, 1024); 
+  client.setBufferSizes(1024, 1024);
 
   HTTPClient http;
-  http.useHTTP10(false); // Render requiere HTTP/1.1 para POST
+  http.useHTTP10(false);  // Render requiere HTTP/1.1 para POST
 
   Serial.println(F("[API] Negociando TLS (MFLN 1024)..."));
 
@@ -24,33 +24,41 @@ void ejecutarAPI() {
 
     // Construcción del JSON
     JsonDocument doc;
-    doc["altura_agua"] = altura_agua;
-    doc["porcentaje"] = porcentaje;
-    doc["tank_h"] = atoi(tank_h);
+    doc["distancia"] = distancia;  // Variable del sensor ultrasónico
+    doc["p_in"] = p.p_in;          // Estado de los botones/LoRa
+    doc["tank_h"] = atoi(tank_h);  // De tus variables de WiFiManager
     doc["sensor_m"] = atoi(sensor_m);
-    doc["delta_max"] = delta_max;
-    doc["boton1"] = sw_remotos[1] ? "1" : "0";
-    doc["boton2"] = sw_remotos[2] ? "1" : "0";
-    doc["boton3"] = sw_remotos[3] ? "1" : "0";
-    doc["boton4"] = sw_remotos[4] ? "1" : "0";
+    doc["delta_max"] = delta_max;  // El delta que mencionaste
 
     String payload;
     serializeJson(doc, payload);
-
     int httpCode = http.POST(payload);
 
     if (httpCode > 0) {
       Serial.printf("[API] Éxito! Código HTTP: %d\n", httpCode);
       apiStatus = 1;
-      
+
       // Procesar respuesta para el LCD
       String respuesta = http.getString();
       JsonDocument resDoc;
       if (!deserializeJson(resDoc, respuesta)) {
-        if (!resDoc["lcd"].isNull()) {
-          bool estadoLcd = resDoc["lcd"];
-          estadoLcd ? lcd.backlight() : lcd.noBacklight();
-          lcdEncendido = estadoLcd;
+        if (!resDoc["p_out"].isNull()) {
+          int p_out_web = resDoc["p_out"];
+
+          // Ejemplo: Si el bit 4 (valor 16) está activo, encendemos. Si no, apagamos.
+          // O puedes usar una clave directa como resDoc["lcd"] si el server lo permite.
+          bool estadoDeseado = (p_out_web & 16);
+
+          if (estadoDeseado != lcdEncendido) {
+            lcdEncendido = estadoDeseado;
+            if (lcdEncendido) {
+              lcd.backlight();
+              actualizarPantallaInmediato();
+            } else {
+              lcd.noBacklight();
+              lcd.clear();
+            }
+          }
         }
       }
     } else {

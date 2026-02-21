@@ -16,37 +16,31 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 const int csPin = 15;
 const int resetPin = 16;
 const int irqPin = 4;
-struct Paquete {
-  float s1;
-  float s2;
-  float s3;
-  float s4;
-  float distancia;
+struct __attribute__((packed)) Payload {
+  float dist;  // 4 bytes
+  byte p_in;   // 1 byte
+  byte p_out;  // 1 byte
 };
 
-struct Payload {
-  float distancia; // Lectura del sensor
-  byte p_in;       // Bits 0-3: Estado de botones en Uno
-  byte p_out;      // Bits 0-3: Órdenes para relés en Uno
-};
-
+Payload p;
 // --- Variables Globales ---
+byte p_in_empaquetado = 0;
 int delta_max = 15;
 char tank_h[6] = "220", sensor_m[6] = "20", tank_delta[5] = "15";
 //char api_url[100] = "http://45.234.117.236:54625/api/Sensores";
-char api_url[100] = "https://simbolar-api.onrender.com/api/Sensores";
+char api_url[100] = "https://simbolar-api-1bc5.onrender.com/api/Sensores";
 int distancia = 0, porcentaje = 0, altura_agua = 0, distanciaAnterior = 0, lecturasEstables = 0;
 bool sw_remotos[5] = { false };
 const int LECTURAS_PARA_ARRANQUE = 5;
-unsigned long  tApi = 0;
-int pantallaActual = 0;      // <--- AQUÍ VA LA VARIABLE
+unsigned long tApi = 0;
+int pantallaActual = 0;  // <--- AQUÍ VA LA VARIABLE
 bool lcdEncendido = true;
 unsigned long tScroll = 0;
 
 int apiStatus = 0;
 bool shouldSaveConfig = false;
 int pantalla = 0;
-
+bool primeramuestralcd = false;
 WiFiManager wm;
 
 WiFiManagerParameter c_h("h", "Altura", tank_h, 5);
@@ -62,7 +56,6 @@ void saveConfigCallback() {
   shouldSaveConfig = true;
 }
 
-Paquete p;
 
 void setup() {
   Serial.begin(115200);
@@ -110,55 +103,18 @@ void setup() {
   configTime(-3 * 3600, 0, "ar.pool.ntp.org", "time.google.com");
   Serial.println(F("\n--- SISTEMA LISTO Y CORRIENDO ---"));
   lcd.clear();
+  
 }
-
-// void loop() {
-//   int packetSize = LoRa.parsePacket();
-
-//   if (packetSize == sizeof(p)) {
-//     // Leemos los 20 bytes y los cargamos en la estructura 'p'
-//     LoRa.readBytes((uint8_t *)&p, sizeof(p));
-
-//     Serial.println(F("\n--- NUEVA MEDICIÓN ---"));
-//     Serial.print(F("Distancia: ")); Serial.print(p.distancia); Serial.println(" cm");
-//     Serial.print(F("S1: ")); Serial.println(p.s1);
-//     Serial.println(F("----------------------"));
-
-//     // Aquí podés llamar a la función que envía a la base de datos
-//     // enviarWeb(p.distancia, p.s1);
-//   }
-//   else if (packetSize > 0) {
-//     // Si llega ruido (114, 197, etc.), lo barremos
-//     while (LoRa.available()) LoRa.read();
-//   }
-
-//   // ¡Muy importante para evitar el Soft WDT reset!
-//   yield();
-// }
 
 
 void loop() {
   wm.process();
   procesarGuardadoConfig();
   gestionarSerial();
-  gestionarBotonMultifuncion(); // Estará en el archivo del Botón
-  // rotarPantallas();
-  // --- LÓGICA DE RECEPCIÓN LORA ---
-  int packetSize = LoRa.parsePacket();
-  if (packetSize == sizeof(p)) {
-    LoRa.readBytes((uint8_t *)&p, sizeof(p));
-    Serial.println(F("LoRa: Datos recibidos y actualizados."));
-    // Aquí podés marcar una bandera si querés que la API se ejecute
-    // inmediatamente después de recibir un dato
-  } else if (packetSize > 0) {
-    while (LoRa.available()) LoRa.read();  // Limpiamos ruido
-  }
-  // --------------------------------
+  gestionarBotonMultifuncion();  // Estará en el archivo del Botón
   actualizarMediciones();
-
   if (WiFi.status() == WL_CONNECTED) {
     ejecutarAPI();
   }
-  rotarPantallas();
   yield();
 }
